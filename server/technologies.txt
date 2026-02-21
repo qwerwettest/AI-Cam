@@ -1,0 +1,106 @@
+﻿Технологии проекта Schedule Server
+====================================
+
+Spring Boot 3.2.2
+  Фреймворк приложения, используется в com/schedule/server/ScheduleServerApplication.java - @SpringBootApplication
+
+Java 17
+  Целевая версия JDK, records, switch expressions, настроено в pom.xml
+
+Maven
+  Система сборки, конфигурация в pom.xml
+
+Spring MVC (REST)
+  REST API контроллеры - @RestController, @GetMapping, @PostMapping
+  используется в com/schedule/server/controller/ScheduleController.java
+  и com/schedule/server/controller/BotBridgeController.java
+
+Spring JDBC (JdbcTemplate)
+  Прямые SQL-запросы к БД, используется в
+  kvt/db/AuditoryRepository.java,
+  kvt/db/AuditoryJournalRepository.java,
+  kvt/db/CameraCabJournalRepository.java,
+  com/schedule/server/service/ScheduleLookupService.java
+
+Spring Data JPA
+  Зависимость подключена в pom.xml, но автоконфигурация явно отключена
+  в ScheduleServerApplication.java (exclude = HibernateJpaAutoConfiguration, JpaRepositoriesAutoConfiguration)
+
+Hibernate (диалект)
+  Настроен SQLServer диалект в application.properties -
+  spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.SQLServerDialect
+
+Microsoft SQL Server
+  СУБД проекта, подключение настроено в application.properties -
+  jdbc:sqlserver://localhost:1433;databaseName=hacaton
+
+mssql-jdbc 12.6.2
+  JDBC-драйвер для SQL Server, подключён в pom.xml
+
+Lombok
+  Аннотации @Data, @RequiredArgsConstructor, @Slf4j используются в
+  com/schedule/server/dto/DayScheduleDto.java,
+  com/schedule/server/dto/LessonDto.java,
+  com/schedule/server/dto/ScheduleDto.java,
+  com/schedule/server/dto/ScheduleFileDto.java,
+  com/schedule/server/controller/BotBridgeController.java,
+  com/schedule/server/controller/ScheduleController.java,
+  com/schedule/server/service/ScheduleService.java,
+  com/schedule/server/service/ScheduleLookupService.java,
+  com/schedule/server/config/GlobalExceptionHandler.java,
+  com/schedule/server/tcp/CppTcpClient.java
+
+Jackson (jackson-databind)
+  Сериализация/десериализация JSON, аннотация @JsonProperty используется в
+  com/schedule/server/dto/CppOut.java,
+  com/schedule/server/dto/DayScheduleDto.java,
+  com/schedule/server/dto/LessonDto.java,
+  com/schedule/server/dto/ScheduleDto.java,
+  com/schedule/server/dto/ScheduleFileDto.java
+
+JSON Simple 1.1.1
+  Формирование и парсинг JSON для TCP-протокола с C++ сервером, используется в
+  com/schedule/server/tcp/CppTcpClient.java - JSONObject, JSONParser
+
+Java TCP Sockets
+  Прямое TCP-соединение с C++ сервером (протокол: 4 байта big-endian длина + JSON UTF-8),
+  используется в com/schedule/server/tcp/CppTcpClient.java - Socket, DataInputStream, DataOutputStream
+
+Java Records
+  Иммутабельные модели данных, используются в
+  kvt/model/Auditory.java,
+  kvt/model/AuditoryJournal.java,
+  kvt/model/CameraCabJournal.java,
+  com/schedule/server/dto/BotIn.java,
+  com/schedule/server/dto/CppOut.java
+
+Spring Validation
+  Библиотека валидации Bean Validation, подключена в pom.xml
+
+Spring Web CORS
+  Глобальная CORS-конфигурация, используется в
+  com/schedule/server/config/CorsConfig.java - CorsFilter
+
+Spring @RestControllerAdvice
+  Глобальная обработка исключений, используется в
+  com/schedule/server/config/GlobalExceptionHandler.java
+
+Spring @Transactional
+  Управление транзакциями, используется в
+  com/schedule/server/service/ScheduleService.java - метод saveSchedule()
+
+Log4j2
+  Логирование (настроено вместо Logback), конфигурация в log4j2.xml,
+  SLF4J-фасад через Lombok @Slf4j во всех сервисах и контроллерах
+
+Apache Tomcat (embedded)
+  Встроенный сервер, настройка server.tomcat.max-http-form-post-size=50MB
+  в application.properties
+
+JUnit 5 (Jupiter)
+  Тестовый фреймворк, используется в
+  com/schedule/server/tcp/CppTcpClientTest.java
+
+ZonedDateTime / ZoneId
+  Работа с часовыми поясами (Asia/Almaty), используется в
+  com/schedule/server/util/TimeUtil.java

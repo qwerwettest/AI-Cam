@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin Excel Uploader</title>
+  <link rel="stylesheet" href="styles.css" />
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+</head>
+<body>
+  <header class="hero">
+    <div class="hero__body">
+      <p class="eyebrow">Админ-панель</p>
+      <h1>Загрузка расписания</h1>
+      <p class="lede">Загрузите .xlsx/.xls, посмотрите распарсенные данные и отправьте их на Java-сервис.</p>
+    </div>
+  </header>
+  <main class="layout">
+    <section class="card">
+      <h2>1. Файл</h2>
+      <label class="label">Выберите Excel</label>
+      <input type="file" id="fileInput" accept=".xlsx,.xls" />
+      <div id="fileInfo" class="muted"></div>
+
+      <label class="label">Лист</label>
+      <select id="sheetSelect" disabled></select>
+    </section>
+
+    <section class="card">
+      <h2>2. Просмотр</h2>
+      <div id="preview" class="preview muted">Загрузите файл, чтобы увидеть данные.</div>
+    </section>
+
+    <section class="card">
+      <h2>3. Отправка</h2>
+      <label class="label">Java endpoint</label>
+      <input type="url" id="endpoint" value="http://localhost:3333/api/schedule/upload" placeholder="http://host:port/api/schedule/upload" />
+
+      <div class="actions">
+        <button id="sendBtn" disabled>Отправить в Java</button>
+        <span id="status" class="muted"></span>
+      </div>
+
+      <div class="payload">
+        <div class="payload__top">
+          <span class="label label-inline">Предпросмотр JSON</span>
+          <button id="copyPayloadBtn" class="ghost" disabled>Скопировать</button>
+        </div>
+        <div id="payloadMeta" class="muted small">Нет данных для отображения.</div>
+        <pre id="payloadPreview" class="payload-pre muted">Загрузите файл, чтобы увидеть JSON.</pre>
+      </div>
+    </section>
+  </main>
+
+  <template id="tableTemplate">
+    <table>
+      <thead></thead>
+      <tbody></tbody>
+    </table>
+  </template>
+
+  <script src="main.js"></script>
+</body>
+</html>
