@@ -25,9 +25,30 @@ Spring Boot сервер-мост между Telegram-ботом и C++ серв
 
 - JDK 17 или новее (проверено на JDK 17 и JDK 25)
 - Maven 3.8+
-- Microsoft SQL Server с базой `hacaton` — нужен только для эндпоинтов расписания;
-  `/api/bridge` работает без БД
-- Запущенный C++ сервер — нужен только для `/api/bridge`
+- Microsoft SQL Server с базой `hacaton` — см. «Локальная БД в Docker» ниже
+- Запущенный C++ сервер — нужен только для поиска через `/api/bridge`;
+  health-check `GET /api/bridge` отвечает и без него
+
+## Локальная БД в Docker
+
+В каталоге [docker/](docker/) лежит готовое окружение: MS SQL 2022, схема и
+демо-данные.
+
+```bash
+docker compose -f docker/docker-compose.yml up -d
+```
+
+```bash
+./docker/init-db.sh
+```
+
+Скрипт дожидается готовности сервера и применяет [01-schema.sql](docker/init/01-schema.sql)
+(три таблицы и пользователь `app_user`) и [02-seed.sql](docker/init/02-seed.sql)
+(10 аудиторий, 6 занятий, 5 камер). Значения по умолчанию в
+`application.properties` подходят к этому окружению без правок.
+
+Схема выведена из фактических запросов Java и C++ — обе системы работают с этими
+таблицами одновременно.
 
 ## Запуск локально
 
