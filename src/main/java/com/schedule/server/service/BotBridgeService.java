@@ -160,9 +160,10 @@ public class BotBridgeService {
             log.info("C++ found free cabinet: {} ({}, этаж {}), бронь {}-{}",
                     name, actualCorpus, floor, room.getBookingStart(), room.getBookingEnd());
 
-            // C++ создал бронь, но не знает, кто её заказал — проставляем владельца,
-            // иначе пользователь не увидит её в /my и не сможет отменить.
-            bindOwner(root, request);
+            // C++ поставил временный резерв, но не знает, кто его заказал.
+            // Закрепляем резерв за пользователем и отдаём его id: подтверждение
+            // и отказ идут именно по нему.
+            room.setHoldId(claimHold(root, request));
 
             return FindRoomResponse.builder()
                     .freeRooms(List.of(room))
@@ -220,28 +221,31 @@ public class BotBridgeService {
     }
 
     /**
-     * Привязывает созданную C++ бронь к пользователю.
-     * Ошибка привязки не должна ломать ответ — поиск уже отработал.
+     * Закрепляет созданный C++ резерв за пользователем.
+     * Ошибка не должна ломать ответ — поиск уже отработал.
+     *
+     * @return id резерва или null
      */
-    private void bindOwner(JsonNode root, FindRoomRequest request) {
+    private Integer claimHold(JsonNode root, FindRoomRequest request) {
         long userId = request.getTelegramUserId();   // 0 — пользователь не передан
         int auditoryId = root.has("id") ? root.get("id").asInt() : 0;
         String start = text(root, "start_time", null);
         String end = text(root, "end_time", null);
 
         if (userId == 0 || auditoryId == 0 || start == null || end == null) {
-            log.warn("Пропускаю привязку владельца: userId={}, auditoryId={}, {}-{}",
+            log.warn("Пропускаю закрепление резерва: userId={}, auditoryId={}, {}-{}",
                     userId, auditoryId, start, end);
-            return;
+            return null;
         }
 
         try {
-            // C++ бронирует на текущий день недели.
+            // C++ резервирует на текущий день недели.
             int dayOfWeek = java.time.LocalDate.now(TimeUtil.ALMATY_ZONE).getDayOfWeek().getValue();
-            bookingService.assignOwner(auditoryId, dayOfWeek,
+            return bookingService.claimHold(auditoryId, dayOfWeek,
                     java.time.LocalTime.parse(start), java.time.LocalTime.parse(end), userId);
         } catch (Exception e) {
-            log.error("Не удалось привязать бронь к пользователю {}: {}", userId, e.getMessage());
+            log.error("Не удалось закрепить резерв за пользователем {}: {}", userId, e.getMessage());
+            return null;
         }
     }
 

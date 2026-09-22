@@ -30,8 +30,27 @@ public class BookingController {
     }
 
     /**
-     * Отмена брони. Пользователь передаётся явно и проверяется: отменить
-     * чужую бронь нельзя.
+     * Подтверждение резерва: кабинет становится бронью.
+     *
+     * <p>До подтверждения кабинет удерживается, но снимается по таймауту,
+     * если пользователь так и не решился.
+     */
+    @PostMapping("/{id}/confirm")
+    public ResponseEntity<Map<String, Object>> confirm(
+            @PathVariable("id") int id,
+            @RequestParam("telegram_user_id") long telegramUserId) {
+
+        if (bookingService.confirm(id, telegramUserId)) {
+            return ResponseEntity.ok(Map.of("status", "ok", "confirmed", id));
+        }
+        return ResponseEntity.status(404).body(Map.of(
+                "status", "error",
+                "message", "Резерв не найден, принадлежит другому пользователю или уже истёк"));
+    }
+
+    /**
+     * Отмена брони или отказ от резерва. Пользователь передаётся явно и
+     * проверяется: тронуть чужую запись нельзя.
      */
     @DeleteMapping("/{id}")
     public ResponseEntity<Map<String, Object>> cancel(

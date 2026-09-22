@@ -2,9 +2,11 @@ package com.schedule.server;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.boot.autoconfigure.orm.jpa.HibernateJpaAutoConfiguration;
 import org.springframework.boot.autoconfigure.data.jpa.JpaRepositoriesAutoConfiguration;
 
+@EnableScheduling
 @SpringBootApplication(
         scanBasePackages = {"com.schedule.server", "kvt"},
         exclude = {

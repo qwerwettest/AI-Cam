@@ -52,6 +52,13 @@ public class RoomInfo {
     /** Тип помещения */
     private String category;
 
+    /**
+     * id временного резерва. Кабинет удерживается, но бронью станет только
+     * после подтверждения. Этот же id используется для отказа.
+     */
+    @JsonProperty("hold_id")
+    private Integer holdId;
+
     /** Начало брони, HH:mm */
     @JsonProperty("booking_start")
     private String bookingStart;

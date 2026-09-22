@@ -40,14 +40,23 @@ CREATE TABLE dbo.auditory_journal (
     -- пользователей не знает и эту колонку не трогает.
     -- NULL — занятие по расписанию, а не пользовательская бронь.
     telegram_user_id BIGINT NULL,
+    -- Момент создания: по нему снимаются неподтверждённые резервы.
+    created_at DATETIME2 NULL DEFAULT SYSDATETIME(),
     CONSTRAINT FK_auditory_journal_auditory
         FOREIGN KEY (aud_id) REFERENCES dbo.auditory(id)
 );
 GO
 
--- Миграция для баз, созданных до появления колонки.
+-- Миграция для баз, созданных до появления колонок.
 IF COL_LENGTH('dbo.auditory_journal', 'telegram_user_id') IS NULL
     ALTER TABLE dbo.auditory_journal ADD telegram_user_id BIGINT NULL;
+GO
+
+-- Момент создания записи. Нужен, чтобы снимать по таймауту временные
+-- резервы (timeStatus = 2), которые пользователь не подтвердил.
+IF COL_LENGTH('dbo.auditory_journal', 'created_at') IS NULL
+    ALTER TABLE dbo.auditory_journal ADD created_at DATETIME2 NULL
+        CONSTRAINT DF_auditory_journal_created_at DEFAULT SYSDATETIME();
 GO
 
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_auditory_journal_user')

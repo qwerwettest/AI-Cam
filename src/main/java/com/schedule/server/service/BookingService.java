@@ -34,7 +34,7 @@ public class BookingService {
                    a.name, a.number, a.corpus, a.category
             FROM dbo.auditory_journal j
             JOIN dbo.auditory a ON a.id = j.aud_id
-            WHERE j.telegram_user_id = ?
+            WHERE j.telegram_user_id = ? AND j.timeStatus = 1
             ORDER BY j.dayOfWeek, j.startTime
             """;
 
@@ -60,47 +60,94 @@ public class BookingService {
     };
 
     /**
-     * Привязывает только что созданную C++ бронь к пользователю.
+     * Закрепляет за пользователем временный резерв, который только что создал C++.
      *
      * <p>C++ возвращает аудиторию и интервал, но не id строки журнала, поэтому
-     * ищем её по совокупности полей. Берём последнюю подходящую запись без
-     * владельца: занятия по расписанию так не затрагиваются.
+     * ищем её по совокупности полей. Берём последнюю запись со статусом 2 без
+     * владельца: занятия по расписанию (NULL) и подтверждённые брони не
+     * затрагиваются.
      *
-     * @return true, если владелец проставлен
+     * @return id резерва или {@code null}, если подходящей записи не нашлось
      */
-    public boolean assignOwner(int auditoryId, int dayOfWeek, LocalTime start, LocalTime end, long telegramUserId) {
+    public Integer claimHold(int auditoryId, int dayOfWeek, LocalTime start, LocalTime end, long telegramUserId) {
+        List<Integer> ids = jdbcTemplate.queryForList("""
+                SELECT TOP (1) id FROM dbo.auditory_journal
+                WHERE aud_id = ? AND dayOfWeek = ?
+                  AND startTime = CAST(? AS time) AND endTime = CAST(? AS time)
+                  AND telegram_user_id IS NULL
+                  AND timeStatus = 2
+                ORDER BY id DESC
+                """, Integer.class, auditoryId, dayOfWeek, start.toString(), end.toString());
+
+        if (ids.isEmpty()) {
+            log.warn("Резерв не найден: aud_id={}, день={}, {}-{}", auditoryId, dayOfWeek, start, end);
+            return null;
+        }
+
+        int holdId = ids.get(0);
+        jdbcTemplate.update("UPDATE dbo.auditory_journal SET telegram_user_id = ? WHERE id = ?",
+                telegramUserId, holdId);
+        log.info("Резерв {} закреплён за пользователем {}", holdId, telegramUserId);
+        return holdId;
+    }
+
+    /**
+     * Подтверждает резерв: статус 2 → 1. До этого момента кабинет удерживается,
+     * но бронью ещё не считается и может быть снят по таймауту.
+     *
+     * @return true, если резерв принадлежал пользователю и был подтверждён
+     */
+    public boolean confirm(int holdId, long telegramUserId) {
         int updated = jdbcTemplate.update("""
                 UPDATE dbo.auditory_journal
-                SET telegram_user_id = ?
-                WHERE id = (
-                    SELECT TOP (1) id FROM dbo.auditory_journal
-                    WHERE aud_id = ? AND dayOfWeek = ?
-                      AND startTime = CAST(? AS time) AND endTime = CAST(? AS time)
-                      AND telegram_user_id IS NULL
-                      AND timeStatus IN (1, 2)
-                    ORDER BY id DESC
-                )
-                """, telegramUserId, auditoryId, dayOfWeek, start.toString(), end.toString());
+                SET timeStatus = 1
+                WHERE id = ? AND telegram_user_id = ? AND timeStatus = 2
+                """, holdId, telegramUserId);
 
-        if (updated == 0) {
-            log.warn("Не удалось привязать бронь к пользователю {}: aud_id={}, {}-{}",
-                    telegramUserId, auditoryId, start, end);
+        if (updated > 0) {
+            log.info("Резерв {} подтверждён пользователем {}", holdId, telegramUserId);
+        } else {
+            log.warn("Подтверждение резерва {} пользователем {} отклонено: "
+                    + "не найден, чужой или уже не резерв", holdId, telegramUserId);
         }
         return updated > 0;
     }
 
-    /** Все брони пользователя. */
+    /**
+     * Снимает неподтверждённые резервы старше {@code minutes} минут.
+     *
+     * <p>Без этого кабинет, который пользователь посмотрел и не подтвердил,
+     * оставался бы занятым до конца запрошенного интервала.
+     *
+     * @return сколько резервов снято
+     */
+    public int purgeStaleHolds(int minutes) {
+        int deleted = jdbcTemplate.update("""
+                DELETE FROM dbo.auditory_journal
+                WHERE timeStatus = 2
+                  AND created_at IS NOT NULL
+                  AND created_at < DATEADD(minute, -?, SYSDATETIME())
+                """, minutes);
+
+        if (deleted > 0) {
+            log.info("Снято неподтверждённых резервов: {}", deleted);
+        }
+        return deleted;
+    }
+
+    /** Подтверждённые брони пользователя. */
     public List<BookingDto> findByUser(long telegramUserId) {
         return jdbcTemplate.query(SELECT_BOOKINGS, rowMapper, telegramUserId);
     }
 
     /**
-     * Отменяет бронь. Удаление строки сразу освобождает кабинет: алгоритм
-     * поиска в C++ считает занятыми только существующие записи журнала.
+     * Отменяет бронь или снимает неподтверждённый резерв. Удаление строки сразу
+     * освобождает кабинет: алгоритм поиска в C++ считает занятыми только
+     * существующие записи журнала.
      *
      * <p>Владелец проверяется в самом запросе — чужую бронь отменить нельзя.
      *
-     * @return true, если бронь принадлежала пользователю и была удалена
+     * @return true, если запись принадлежала пользователю и была удалена
      */
     public boolean cancel(int bookingId, long telegramUserId) {
         int deleted = jdbcTemplate.update(
