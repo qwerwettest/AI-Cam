@@ -9,7 +9,8 @@ import java.time.format.DateTimeFormatter;
  */
 public final class TimeUtil {
 
-    private static final ZoneId ALMATY_ZONE = ZoneId.of("Asia/Almaty");
+    /** Часовой пояс проекта. */
+    public static final ZoneId ALMATY_ZONE = ZoneId.of("Asia/Almaty");
     private static final DateTimeFormatter HH_MM = DateTimeFormatter.ofPattern("HH:mm");
 
     private TimeUtil() {

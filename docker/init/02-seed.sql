@@ -3,9 +3,9 @@
 
   Значения corpus обязаны совпадать с маппингом LOCATION_TO_CORPUS
   в com.schedule.server.service.BotBridgeService:
-      main   -> Главный
       corp_a -> Корпус А
       corp_b -> Корпус Б
+      corp_c -> Корпус С
 
   Этаж Java вычисляет как number / 100, поэтому номера трёхзначные.
 */
@@ -16,11 +16,11 @@ GO
 IF NOT EXISTS (SELECT 1 FROM dbo.auditory)
 BEGIN
     INSERT INTO dbo.auditory (name, number, corpus, category) VALUES
-        (N'101', 101, N'Главный',  N'Лекционная'),
-        (N'102', 102, N'Главный',  N'Лаборатория'),
-        (N'201', 201, N'Главный',  N'Лекционная'),
-        (N'202', 202, N'Главный',  N'Компьютерный класс'),
-        (N'301', 301, N'Главный',  N'Лекционная'),
+        (N'С-101', 101, N'Корпус С',  N'Лекционная'),
+        (N'С-102', 102, N'Корпус С',  N'Лаборатория'),
+        (N'С-201', 201, N'Корпус С',  N'Лекционная'),
+        (N'С-202', 202, N'Корпус С',  N'Компьютерный класс'),
+        (N'С-301', 301, N'Корпус С',  N'Лекционная'),
         (N'А-101', 101, N'Корпус А', N'Лекционная'),
         (N'А-201', 201, N'Корпус А', N'Компьютерный класс'),
         (N'А-202', 202, N'Корпус А', N'Лаборатория'),
@@ -37,10 +37,10 @@ BEGIN
     SELECT a.id, d.dayOfWeek, d.startTime, d.endTime, d.duration, 0
     FROM dbo.auditory a
     JOIN (VALUES
-        (N'101',   1, CAST('09:00' AS TIME), CAST('10:30' AS TIME), 90),
-        (N'101',   1, CAST('11:00' AS TIME), CAST('12:30' AS TIME), 90),
-        (N'102',   1, CAST('09:00' AS TIME), CAST('12:30' AS TIME), 210),
-        (N'201',   2, CAST('14:00' AS TIME), CAST('15:30' AS TIME), 90),
+        (N'С-101', 1, CAST('09:00' AS TIME), CAST('10:30' AS TIME), 90),
+        (N'С-101', 1, CAST('11:00' AS TIME), CAST('12:30' AS TIME), 90),
+        (N'С-102', 1, CAST('09:00' AS TIME), CAST('12:30' AS TIME), 210),
+        (N'С-201', 2, CAST('14:00' AS TIME), CAST('15:30' AS TIME), 90),
         (N'А-101', 1, CAST('08:00' AS TIME), CAST('09:30' AS TIME), 90),
         (N'Б-101', 3, CAST('10:00' AS TIME), CAST('11:30' AS TIME), 90)
     ) AS d(name, dayOfWeek, startTime, endTime, duration)
@@ -55,7 +55,7 @@ BEGIN
     INSERT INTO dbo.camera_cab_journal (camera_ip, id_cab, login_camera, password_camera, port_camera, is_busy)
     SELECT N'192.168.1.' + CAST(100 + a.id AS NVARCHAR(8)), a.id, N'admin', N'camera_pass', N'554', 0
     FROM dbo.auditory a
-    WHERE a.name IN (N'101', N'201', N'А-101', N'А-201', N'Б-101');
+    WHERE a.name IN (N'С-101', N'С-201', N'А-101', N'А-201', N'Б-101');
 END
 GO
 

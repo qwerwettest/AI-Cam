@@ -48,4 +48,27 @@ public class RoomInfo {
     /** ID аудитории в БД */
     @JsonProperty("auditory_id")
     private Integer auditoryId;
+
+    /** Тип помещения */
+    private String category;
+
+    /** Начало брони, HH:mm */
+    @JsonProperty("booking_start")
+    private String bookingStart;
+
+    /** Конец брони, HH:mm */
+    @JsonProperty("booking_end")
+    private String bookingEnd;
+
+    /** Длительность брони в минутах */
+    @JsonProperty("duration_minutes")
+    private Integer durationMinutes;
+
+    /** Кабинет в запрошенном корпусе. false — C++ предложил запасной вариант. */
+    @JsonProperty("corpus_matched")
+    private Boolean corpusMatched;
+
+    /** Кабинет на запрошенном этаже. false — свободных на нём не было. */
+    @JsonProperty("floor_matched")
+    private Boolean floorMatched;
 }

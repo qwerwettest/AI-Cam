@@ -6,6 +6,7 @@ import com.schedule.server.dto.FindRoomRequest;
 import com.schedule.server.dto.FindRoomResponse;
 import com.schedule.server.dto.RoomInfo;
 import com.schedule.server.tcp.CppTcpClient;
+import com.schedule.server.util.TimeUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -39,13 +40,15 @@ public class BotBridgeService {
     private final CppTcpClient cppTcpClient;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
+    private final BookingService bookingService;
+
     /**
      * Маппинг location_id (из конфига бота) → corpus (строка для C++ сервера).
      */
     private static final Map<String, String> LOCATION_TO_CORPUS = Map.of(
-            "main", "Главный",
             "corp_a", "Корпус А",
-            "corp_b", "Корпус Б"
+            "corp_b", "Корпус Б",
+            "corp_c", "Корпус С"
     );
 
     /**
@@ -96,6 +99,10 @@ public class BotBridgeService {
         payload.put("duration", request.getDurationMinutes());
         payload.put("corpus", corpus);
 
+        // Этаж: C++ использует его как предпочтение при сортировке.
+        // 0 означает "этаж не важен".
+        payload.put("floor", request.getFloor() != null ? request.getFloor() : 0);
+
         return payload;
     }
 
@@ -122,18 +129,40 @@ public class BotBridgeService {
         String status = root.has("status") ? root.get("status").asText("") : "";
 
         if (cabinetNumber > 0 && "answer".equals(status)) {
-            // Кабинет найден — формируем один элемент в free_rooms
+            // Номера кабинетов повторяются между корпусами (101 есть и в А, и в Б),
+            // поэтому имя и корпус берём из ответа C++, а не из запроса.
+            String name = text(root, "name", String.valueOf(cabinetNumber));
+            String actualCorpus = text(root, "corpus", corpus);
+            int floor = root.has("floor") ? root.get("floor").asInt(cabinetNumber / 100)
+                                          : cabinetNumber / 100;
+
+            Integer requestedFloor = request.getFloor();
+
             RoomInfo room = RoomInfo.builder()
-                    .name(String.valueOf(cabinetNumber))
-                    .locationName(corpus)
+                    .name(name)
+                    .locationName(actualCorpus)
                     .locationId(request.getLocationId())
-                    .floor(cabinetNumber / 100)       // 103 → этаж 1, 215 → этаж 2
+                    .floor(floor)
+                    .category(text(root, "category", null))
+                    .auditoryId(root.has("id") ? root.get("id").asInt() : null)
+                    .bookingStart(text(root, "start_time", null))
+                    .bookingEnd(text(root, "end_time", null))
+                    .durationMinutes(root.has("duration") ? root.get("duration").asInt()
+                                                          : request.getDurationMinutes())
+                    .corpusMatched(actualCorpus.equals(corpus))
+                    .floorMatched(requestedFloor == null || requestedFloor == 0
+                                  || requestedFloor == floor)
                     .cameraFree(true)
                     .cameraStatus("свободен")
                     .scheduleFree(true)
                     .build();
 
-            log.info("C++ found free cabinet: {}", cabinetNumber);
+            log.info("C++ found free cabinet: {} ({}, этаж {}), бронь {}-{}",
+                    name, actualCorpus, floor, room.getBookingStart(), room.getBookingEnd());
+
+            // C++ создал бронь, но не знает, кто её заказал — проставляем владельца,
+            // иначе пользователь не увидит её в /my и не сможет отменить.
+            bindOwner(root, request);
 
             return FindRoomResponse.builder()
                     .freeRooms(List.of(room))
@@ -188,5 +217,40 @@ public class BotBridgeService {
         if (locationId == null) return "Главный";
         String corpus = LOCATION_TO_CORPUS.get(locationId.toLowerCase());
         return corpus != null ? corpus : locationId;
+    }
+
+    /**
+     * Привязывает созданную C++ бронь к пользователю.
+     * Ошибка привязки не должна ломать ответ — поиск уже отработал.
+     */
+    private void bindOwner(JsonNode root, FindRoomRequest request) {
+        long userId = request.getTelegramUserId();   // 0 — пользователь не передан
+        int auditoryId = root.has("id") ? root.get("id").asInt() : 0;
+        String start = text(root, "start_time", null);
+        String end = text(root, "end_time", null);
+
+        if (userId == 0 || auditoryId == 0 || start == null || end == null) {
+            log.warn("Пропускаю привязку владельца: userId={}, auditoryId={}, {}-{}",
+                    userId, auditoryId, start, end);
+            return;
+        }
+
+        try {
+            // C++ бронирует на текущий день недели.
+            int dayOfWeek = java.time.LocalDate.now(TimeUtil.ALMATY_ZONE).getDayOfWeek().getValue();
+            bookingService.assignOwner(auditoryId, dayOfWeek,
+                    java.time.LocalTime.parse(start), java.time.LocalTime.parse(end), userId);
+        } catch (Exception e) {
+            log.error("Не удалось привязать бронь к пользователю {}: {}", userId, e.getMessage());
+        }
+    }
+
+    /** Достаёт строковое поле из ответа C++, если оно есть и непустое. */
+    private static String text(JsonNode root, String field, String fallback) {
+        if (root == null || !root.has(field)) {
+            return fallback;
+        }
+        String value = root.get(field).asText("");
+        return value.isBlank() ? fallback : value;
     }
 }

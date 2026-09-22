@@ -36,9 +36,23 @@ CREATE TABLE dbo.auditory_journal (
     endTime    TIME NULL,
     duration   INT  NULL,
     timeStatus INT  NULL,
+    -- Кто забронировал. Заполняет Java после ответа C++: сам C++ про
+    -- пользователей не знает и эту колонку не трогает.
+    -- NULL — занятие по расписанию, а не пользовательская бронь.
+    telegram_user_id BIGINT NULL,
     CONSTRAINT FK_auditory_journal_auditory
         FOREIGN KEY (aud_id) REFERENCES dbo.auditory(id)
 );
+GO
+
+-- Миграция для баз, созданных до появления колонки.
+IF COL_LENGTH('dbo.auditory_journal', 'telegram_user_id') IS NULL
+    ALTER TABLE dbo.auditory_journal ADD telegram_user_id BIGINT NULL;
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_auditory_journal_user')
+    CREATE INDEX IX_auditory_journal_user
+        ON dbo.auditory_journal (telegram_user_id);
 GO
 
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_auditory_journal_lookup')
